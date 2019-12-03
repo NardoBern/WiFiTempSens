@@ -1,76 +1,76 @@
-// Including the ESP8266 WiFi library
+
 #include <ESP8266WiFi.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <WiFiUDP.h>
 
-// Replace with your network details
+// Configurazione Wifi
 const char* ssid = "TempSensNetwork";
 const char* password = "0111198125121984";
+// Configurazione del sensore
 const char* sensId = "cucina";
 const char* wakeUpMsg = "cucinaSveglia";
 const char* sleepMsg = "cucinaDormi";
 boolean wifiConnected = false;
-// Data wire is plugged into pin D1 on the ESP8266 12-E - GPIO 2
+// Configurazione del bus one-wire sul GPIO 2
 #define ONE_WIRE_BUS 2
 
+// Definizione variabili
 IPAddress broadcastIp(10,0,1,1);
 IPAddress remote;
 IPAddress myIpAddr;
-
-// UDP variables
 unsigned int localPort = 64123;
 WiFiUDP UDP;
 boolean udpConnected = false;
-char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; //buffer to hold incoming packet,
+char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; //buffer per contenere i dati in ricezione
 
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+// Istanza del bus di comunicazione OneWire
 OneWire oneWire(ONE_WIRE_BUS);
 
-// Pass our oneWire reference to Dallas Temperature. 
+// Istanza del blocco di interfaccia verso il sensore di temperatura
 DallasTemperature DS18B20(&oneWire);
 char temperatureCString[6];
 char temperatureFString[6];
 
-// Web Server on port 80
+// Istanza del webserver sulla porta 80
 WiFiServer server(80);
 
-// only runs once on boot
+// Funzione di setup
 void setup() {
-  // Initializing serial port for debugging purposes
+  // Inizializzazione porta seriale per scopi di debug
   Serial.begin(115200);
   delay(10);
-// Initialise wifi connection
+// Inizializzazione connessione Wifi
 wifiConnected = connectWifi();
 
-// only proceed if wifi connection successful
+// Impostazione porta UDP
   if(wifiConnected){
   udpConnected = connectUDP();
     if (udpConnected){
   
     }
   }
-  DS18B20.begin(); // IC Default 9 bit. If you have troubles consider upping it 12. Ups the delay giving the IC more time to process the temperature measurement
+  DS18B20.begin(); // Avvio sensore di temperatura
   
 }
 
 
 
-// runs over and over again
+// Funzione ricorsiva
 void loop() {
+  // Acquisizione temperatura
   getTemperature();
-  //Serial.println(temperatureCString);
   
-   // check if the WiFi and UDP connections were successful
+   // Controllo se la connessione Wifi e la porta UDP sono connesse
 if(wifiConnected){
   if(udpConnected){
     Serial.println("");
     Serial.print("Aspetto la sveglia");
     getUDP();
-    //Start broadcast of Temperature
-      if(String(packetBuffer) == wakeUpMsg) //If start packet is received
+    // Attendo il messaggio di sveglia
+      if(String(packetBuffer) == wakeUpMsg) // Messaggio di sveglia ricevuto
       {
-        while(String(packetBuffer) != sleepMsg) //Stops transmitting Temperature Data if "STOP" is received on UDP
+        while(String(packetBuffer) != sleepMsg) // Sino a quando non ricevo il messaggio di tornare a dormire
         {
           getTemperature();
           memset(packetBuffer, 0, sizeof(packetBuffer));
@@ -106,10 +106,26 @@ if(wifiConnected){
 delay(10);   
 
   }
+  // Se invece non sono connesso alla Wifi, allora attendo un secondo e provo a riconnettermi
+else{
+  delay(1000);
+  Serial.println("");
+  Serial.print("Provo a connettermi nuovamente alla WiFi...");
+  // Inizializzazione connessione alla Wifi
+  wifiConnected = connectWifi();
+
+// Se connesso, allora configura la porta UDP
+  if(wifiConnected){
+  udpConnected = connectUDP();
+    if (udpConnected){
+  
+    }
+  }
+}
    
 }
 
-//Get UDP Data
+// Funzione di ricezione dati da UDP
 void getUDP(){
   int packetSize = UDP.parsePacket();
   if(packetSize)
@@ -139,7 +155,7 @@ void getUDP(){
 }
 
 
-// connect to UDP – returns true if successful or false if not
+// connessione e configurazione della porta UDP
 boolean connectUDP()
 {
   boolean state = false;
@@ -159,7 +175,7 @@ boolean connectUDP()
 
   return state;
 }
-// connect to wifi – returns true if successful or false if not
+// Funzione di connessione alla Wifi
 boolean connectWifi()
 {
   boolean state = true;
@@ -203,7 +219,7 @@ boolean connectWifi()
   return state;
 }
 
-//Get Temperature of 18D20
+// Funzione di lettura della temperatura
 void getTemperature() 
 {
   float tempC;
